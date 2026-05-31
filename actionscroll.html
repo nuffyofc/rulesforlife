@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ActionScroll</title>
+<style>
+/* ── Rainbow palette ── */
+:root {
+  --r1:#ff3b30; --r2:#ff9500; --r3:#ffcc00; --r4:#34c759; --r5:#00c7be; --r6:#007aff; --r7:#af52de;
+  --bg:#000; --surface:#111; --surface2:#1a1a1a; --surface3:#222;
+  --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.15);
+  --text:#fff; --text2:rgba(255,255,255,0.55); --text3:rgba(255,255,255,0.25);
+  --pill:rgba(255,255,255,0.07); --pill2:rgba(255,255,255,0.12);
+}
+[data-theme="light"] {
+  --bg:#fff; --surface:#f2f2f7; --surface2:#e5e5ea; --surface3:#d1d1d6;
+  --border:rgba(0,0,0,0.08); --border2:rgba(0,0,0,0.15);
+  --text:#000; --text2:rgba(0,0,0,0.5); --text3:rgba(0,0,0,0.25);
+  --pill:rgba(0,0,0,0.05); --pill2:rgba(0,0,0,0.1);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif}
+
+/* ── App shell ── */
+.app{display:flex;flex-direction:column;height:100dvh;max-width:430px;margin:0 auto;position:relative;background:var(--bg)}
+
+/* ── Topbar ── */
+.topbar{z-index:100;padding:env(safe-area-inset-top,0) 18px 0;background:var(--bg)}
+.topbar-inner{display:flex;align-items:center;justify-content:space-between;padding:13px 0 11px;border-bottom:1px solid var(--border)}
+.brand-name{font-size:17px;font-weight:700;letter-spacing:-0.03em;
+  background:linear-gradient(90deg,var(--r1),var(--r2),var(--r3),var(--r4),var(--r6),var(--r7));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.brand-sub{font-size:11px;color:var(--text3);margin-top:1px;letter-spacing:-0.01em}
+.topbar-right{display:flex;gap:8px}
+.icon-btn{width:32px;height:32px;border-radius:10px;background:var(--pill);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;color:var(--text2)}
+.icon-btn:hover{background:var(--pill2);color:var(--text)}
+.icon-btn:active{transform:scale(.93)}
+.icon-btn svg{display:block}
+
+/* ── Single rainbow progress bar ── */
+.prog-wrap{padding:12px 18px 4px;background:var(--bg)}
+.prog-track{position:relative;height:36px;display:flex;align-items:center}
+.prog-line-bg{position:absolute;left:8px;right:8px;height:2px;background:var(--surface2);border-radius:1px;z-index:0}
+.prog-line-fill{position:absolute;left:8px;height:2px;border-radius:1px;z-index:1;
+  background:linear-gradient(90deg,#ff3b30,#ff9500,#ffcc00,#34c759,#00c7be,#007aff,#af52de);
+  transition:width .5s cubic-bezier(.4,0,.2,1);min-width:0}
+.prog-nodes{position:absolute;left:0;right:0;display:flex;justify-content:space-between;padding:0 8px;z-index:2}
+.prog-node{width:12px;height:12px;border-radius:50%;border:2px solid var(--surface2);
+  background:var(--bg);cursor:pointer;transition:.25s;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;position:relative}
+.prog-node.done{border-width:0;width:14px;height:14px}
+.prog-node.failed{border-width:0;width:14px;height:14px;background:#ff3b30 !important}
+.prog-node.active{border-color:transparent;width:16px;height:16px;box-shadow:0 0 0 3px rgba(255,255,255,.13)}
+.prog-node.locked{opacity:.2;cursor:default;pointer-events:none}
+.prog-node svg{display:block}
+.prog-labels{display:flex;justify-content:space-between;padding:0 4px;margin-top:1px}
+.prog-lbl{font-size:9px;font-weight:600;color:var(--text3);letter-spacing:-.01em;
+  width:20px;text-align:center;transition:.2s;font-variant-numeric:tabular-nums}
+.prog-lbl.active{color:var(--text);font-weight:700}
+.prog-lbl.done{color:var(--text2)}
+.prog-lbl.failed{color:#ff3b30}
+
+/* ── Feed ── */
+.feed{flex:1;overflow-y:scroll;overflow-x:hidden;scroll-snap-type:y mandatory;scrollbar-width:none}
+.feed::-webkit-scrollbar{display:none}
+
+/* ── Card ── */
+.card{scroll-snap-align:start;min-height:calc(100dvh - 110px);padding:16px 18px 20px;
+  display:flex;flex-direction:column;gap:14px;position:relative}
+
+/* rule hue stripe — thin left accent per rule */
+.card::before{content:'';position:absolute;left:0;top:24px;bottom:24px;width:3px;border-radius:0 2px 2px 0}
+
+/* ── Rule meta ── */
+.rule-meta{display:flex;align-items:center;justify-content:space-between;padding-left:10px}
+.rule-counter{font-size:11px;font-weight:500;color:var(--text3);letter-spacing:-.01em}
+.status-pill{padding:3px 9px;border-radius:99px;font-size:10px;font-weight:600;display:none;align-items:center;gap:4px}
+.status-pill.done{display:inline-flex;background:rgba(52,199,89,.12);color:#34c759;border:1px solid rgba(52,199,89,.2)}
+.status-pill.failed{display:inline-flex;background:rgba(255,59,48,.1);color:#ff3b30;border:1px solid rgba(255,59,48,.18)}
+
+/* ── Title ── */
+.rule-title{font-size:clamp(21px,5.5vw,27px);font-weight:700;line-height:1.2;letter-spacing:-.035em;padding-left:10px}
+
+/* ── Challenge card ── */
+.ch-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:15px;position:relative;overflow:hidden}
+.ch-box::before{content:'';position:absolute;left:0;inset-y:0;width:3px}
+.ch-label{font-size:10px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;margin-bottom:8px;opacity:.7}
+.ch-text{font-size:14px;font-weight:500;line-height:1.5;letter-spacing:-.01em}
+
+/* ── Steps ── */
+.steps-label{font-size:10px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--text3);padding-left:2px}
+.step-item{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;background:var(--pill);border-radius:12px;border:1px solid var(--border);transition:.2s}
+.step-item:hover{background:var(--pill2)}
+.step-num{flex-shrink:0;width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;margin-top:1px}
+.step-text{font-size:13px;line-height:1.5;color:var(--text2);letter-spacing:-.01em}
+
+/* ── Tip ── */
+.tip-box{padding:11px 13px;border-radius:0 12px 12px 0;position:relative}
+.tip-box::before{content:'';position:absolute;left:0;inset-y:0;width:2px;border-radius:1px}
+.tip-text{font-size:12px;line-height:1.6;color:var(--text2);font-style:italic;letter-spacing:-.01em}
+
+/* ── CTA ── */
+.cta-area{margin-top:auto;display:flex;flex-direction:column;gap:9px}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.btn{padding:14px;border-radius:14px;font-size:13px;font-weight:600;letter-spacing:-.01em;
+  display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:.15s;border:1px solid;
+  font-family:inherit}
+.btn:active{transform:scale(.97)}
+.btn-skip{background:rgba(255,59,48,.09);border-color:rgba(255,59,48,.18);color:#ff3b30}
+.btn-skip.on{background:#ff3b30;border-color:#ff3b30;color:#fff}
+.btn-done{border-color:rgba(255,255,255,0.12);color:var(--text);font-weight:700}
+.btn-done.on{border-color:rgba(52,199,89,.3);color:#34c759;background:rgba(52,199,89,.1)}
+[data-theme="light"] .btn-done{border-color:rgba(0,0,0,.12);color:var(--text)}
+
+/* ── Scroll nudge zone ── */
+.nudge-zone{display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 0}
+.nudge-label{font-size:11px;font-weight:500;color:var(--text3);letter-spacing:-.01em}
+.nudge-arrows{display:flex;flex-direction:column;align-items:center;gap:0}
+.arrow-chevron{width:20px;height:12px;opacity:0;animation:chevFade 1.4s ease-in-out infinite}
+.arrow-chevron:nth-child(1){animation-delay:0s}
+.arrow-chevron:nth-child(2){animation-delay:.18s}
+.arrow-chevron:nth-child(3){animation-delay:.36s}
+@keyframes chevFade{0%,100%{opacity:.1;transform:translateY(-3px)}50%{opacity:.7;transform:translateY(3px)}}
+.nudge-bar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  border:1.5px solid var(--border2);position:relative;overflow:hidden;cursor:pointer}
+.nudge-bar::after{content:'';position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(var(--hue,#007aff) var(--pct,0%), transparent 0%);opacity:.3}
+.nudge-ring{position:absolute;inset:4px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center}
+.nudge-ring svg{display:block}
+
+/* ── Timer pill ── */
+.timer-pill{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:99px;
+  background:var(--pill);border:1px solid var(--border2);font-size:11px;color:var(--text3);
+  font-weight:600;align-self:center}
+.t-ring{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--surface3);
+  border-top-color:var(--r6);animation:spin 1s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Locked ── */
+.locked-overlay{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;background:var(--bg)}
+.lock-glyph{color:var(--text3)}
+.lock-label{font-size:12px;font-weight:500;color:var(--text3);letter-spacing:-.01em}
+
+/* ── Bottom sheet ── */
+.sheet-wrap{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);
+  display:none;align-items:flex-end;padding-bottom:env(safe-area-inset-bottom,0)}
+.sheet-wrap.open{display:flex;animation:sheetIn .28s cubic-bezier(.32,.72,0,1)}
+@keyframes sheetIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.sheet{width:100%;max-width:430px;margin:0 auto;background:var(--surface);
+  border-radius:20px 20px 0 0;border-top:1px solid var(--border2);
+  padding:16px 18px calc(env(safe-area-inset-bottom,0px) + 24px)}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:var(--surface2);margin:0 auto 18px}
+.sheet-head{font-size:17px;font-weight:700;letter-spacing:-.025em;margin-bottom:14px}
+.ledger{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.l-cell{aspect-ratio:1;border-radius:12px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;border:1px solid var(--border);background:var(--surface2);gap:3px}
+.l-cell.done{background:rgba(52,199,89,.1);border-color:rgba(52,199,89,.2)}
+.l-cell.failed{background:rgba(255,59,48,.08);border-color:rgba(255,59,48,.15)}
+.l-id{font-size:11px;font-weight:700;color:var(--text2)}
+.l-cell.done .l-id{color:#34c759}
+.l-cell.failed .l-id{color:#ff3b30}
+.l-ic{font-size:10px;color:var(--text3)}
+.l-cell.done .l-ic{color:#34c759}
+.l-cell.failed .l-ic{color:#ff3b30}
+
+@media(min-width:430px){.app{border-left:1px solid var(--border);border-right:1px solid var(--border)}}
+
+/* ── Summary ── */
+.summary{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 18px;text-align:center;gap:20px}
+.summary-score{font-size:64px;font-weight:800;letter-spacing:-.04em;line-height:1}
+.summary-msg{font-size:13px;font-weight:600;color:var(--text2);letter-spacing:-.01em}
+.summary-rows{width:100%;display:flex;flex-direction:column;gap:8px}
+.s-row{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;text-align:left}
+.s-ico{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;font-weight:700}
+.s-txt{font-size:13px;font-weight:500;flex:1;letter-spacing:-.01em;color:var(--text)}
+.s-st{font-size:11px;font-weight:600;flex-shrink:0}
+.summary-reset{margin-top:8px;padding:14px 32px;border-radius:14px;font-size:14px;font-weight:600;background:var(--surface2);border:1px solid var(--border2);color:var(--text);cursor:pointer;transition:.15s;font-family:inherit}
+.summary-reset:hover{background:var(--surface3)}
+.summary-reset:active{transform:scale(.97)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div>
+        <div class="brand-name">ActionScroll</div>
+        <div class="brand-sub">1-Day Real Life Challenges</div>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" id="themeBtn" aria-label="Toggle theme">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="gridBtn" aria-label="Progress">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <rect x="1" y="1" width="5.5" height="5.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+            <rect x="8.5" y="1" width="5.5" height="5.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+            <rect x="1" y="8.5" width="5.5" height="5.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+            <rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="prog-wrap" id="progWrap">
+    <div class="prog-track">
+      <div class="prog-line-bg"></div>
+      <div class="prog-line-fill" id="progFill"></div>
+      <div class="prog-nodes" id="progNodes"></div>
+    </div>
+    <div class="prog-labels" id="progLabels"></div>
+  </div>
+  <div class="feed" id="feed"></div>
+</div>
+
+<!-- Progress sheet -->
+<div class="sheet-wrap" id="sheetWrap">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">Action Ledger</div>
+    <div class="ledger" id="ledger"></div>
+  </div>
+</div>
+
+<script>
+const HUES = ['#ff3b30','#ff9500','#ffcc00','#34c759','#00c7be','#007aff','#af52de'];
+
+const RULES = [
+  {id:1,title:'Show me your friends and I\'ll show you your future.',
+   challenge:'Audit your closest relationships and identify one that pulls you downward.',
+   steps:['List the five people you spend the most time with.','Rate each on whether they challenge or comfort you.','Schedule a conversation with the one who challenges you most.'],
+   tips:'Your trajectory is the average of the five people you orbit most closely.'},
+  {id:2,title:'Your doubts are not products of accurate thinking, but habitual thinking.',
+   challenge:'Catch and rewrite three self-doubt thoughts today as factual observations.',
+   steps:['Notice the first moment you doubt yourself today and freeze it.','Write down the doubt and label it as a habit, not truth.','Replace it with one cold fact that contradicts it.'],
+   tips:'Doubt is just a neural groove worn deep by repetition, not a mirror of reality.'},
+  {id:3,title:'Being all you can be is possible for anyone, but super success is not for everyone. Period.',
+   challenge:'Identify the price you are unwilling to pay and own it honestly.',
+   steps:['Write down what super success would require from you in the next year.','Circle the one sacrifice you are not genuinely ready to make.','Decide whether to accept that limit or transcend it — no judgment either way.'],
+   tips:'Super success demands super cost. The honest choice is clearer than the comfortable lie.'},
+  {id:4,title:'Fear of failure is caused by lack of self-esteem and confidence. Dealing with fear is the key to super success.',
+   challenge:'Do one thing today that you might fail at, intentionally.',
+   steps:['Pick a small task with real risk of embarrassment or failure.','Set a timer for 10 minutes and start before you feel ready.','Afterward, note what actually happened vs what you feared.'],
+   tips:'Fear shrinks when you move toward it. Confidence is a byproduct of action, not its prerequisite.'},
+  {id:5,title:'We are all afraid. A high performance person uses his fear to galvanize his actions.',
+   challenge:'Channel fear into fuel: convert one anxious energy spike into intense focused work.',
+   steps:['Notice when fear or anxiety rises in your body today.','Label the energy level 1-10, then channel it into a physical or deep-work burst.','Write down what fear made you produce that calm never could.'],
+   tips:'The same adrenaline that fuels panic also fuels performance. The valve is in your hands.'}
+];
+
+let state = {
+  idx: parseInt(localStorage.getItem('as_idx')||'0'),
+  hist: JSON.parse(localStorage.getItem('as_hist')||'{}'),
+  timers: {}
+};
+
+const hue = i => HUES[i % HUES.length];
+const save = () => { localStorage.setItem('as_idx', state.idx); localStorage.setItem('as_hist', JSON.stringify(state.hist)); };
+
+function markStatus(id, s) { state.hist[id] = s; save(); renderAll(); }
+
+/* ── Single rainbow progress bar ── */
+function renderProg() {
+  const nodes = document.getElementById('progNodes');
+  const labels = document.getElementById('progLabels');
+  const fill = document.getElementById('progFill');
+  if (!nodes) return;
+  nodes.innerHTML = ''; labels.innerHTML = '';
+
+  // Compute fill width: from first node to current active node
+  const total = RULES.length;
+  const doneCount = RULES.filter((_,i) => i < state.idx).length;
+  // fill spans node-to-node; each node is equally spaced across the line
+  // line goes from 8px to (width-8px), nodes spaced equally
+  // we express as % of the nodes span
+  const pct = total > 1 ? (state.idx / (total - 1)) * 100 : 0;
+  // use JS to set actual width after paint via a small trick with container
+  fill.style.width = '0%';
+  requestAnimationFrame(() => {
+    const trackW = fill.parentElement.offsetWidth - 16; // minus 2*8px padding
+    fill.style.width = (pct / 100 * trackW) + 'px';
+  });
+
+  RULES.forEach((r, i) => {
+    const h = state.hist[r.id];
+    const color = hue(i);
+
+    // Node
+    const nd = document.createElement('div');
+    nd.className = 'prog-node';
+    if (i > state.idx) nd.classList.add('locked');
+    else if (h === 'done') { nd.classList.add('done'); nd.style.background = color; nd.innerHTML = `<svg width="7" height="7" viewBox="0 0 7 7" fill="none"><path d="M1 3.5l2 2 3-3" stroke="#000" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`; }
+    else if (h === 'failed') { nd.classList.add('failed'); nd.innerHTML = `<svg width="7" height="7" viewBox="0 0 7 7" fill="none"><path d="M1.5 1.5l4 4M5.5 1.5l-4 4" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></svg>`; }
+    else if (i === state.idx) { nd.classList.add('active'); nd.style.background = color; nd.style.borderColor = color; }
+    else { nd.style.borderColor = color; }
+
+    nd.addEventListener('click', () => {
+      if (i <= state.idx) {
+        const card = document.getElementById('card-'+i);
+        if (card) card.scrollIntoView({behavior:'smooth'});
+      }
+    });
+    nodes.appendChild(nd);
+
+    // Label
+    const lb = document.createElement('div');
+    lb.className = 'prog-lbl' + (i === state.idx ? ' active' : h === 'done' ? ' done' : h === 'failed' ? ' failed' : '');
+    lb.textContent = i + 1;
+    if (i === state.idx) lb.style.color = color;
+    labels.appendChild(lb);
+  });
+}
+
+/* ── Feed ── */
+function renderFeed() {
+  const feed = document.getElementById('feed');
+  feed.innerHTML = '';
+
+  RULES.forEach((rule, index) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = 'card-'+index;
+
+    const color = hue(index);
+
+    // left accent stripe
+    card.style.setProperty('--card-hue', color);
+    card.style.cssText += `--card-hue:${color}`;
+    card.querySelector?.('.card::before');
+
+    const unlocked = index <= state.idx;
+
+    if (!unlocked) {
+      card.innerHTML = `
+        <div class="locked-overlay">
+          <svg class="lock-glyph" width="32" height="32" viewBox="0 0 24 24" fill="none">
+            <rect x="5" y="11" width="14" height="11" rx="2.5" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <div class="lock-label">Unlocks after the timer</div>
+        </div>`;
+      feed.appendChild(card);
+      return;
+    }
+
+    const h = state.hist[rule.id];
+    const isActive = index === state.idx;
+
+    const statusBadge = h==='done'
+      ? `<span class="status-pill done">✓ Complete</span>`
+      : h==='failed' ? `<span class="status-pill failed">✕ Skipped</span>` : '';
+
+    const stepsHtml = rule.steps.map((s, si) => `
+      <div class="step-item">
+        <div class="step-num" style="background:${color}22;color:${color}">${si+1}</div>
+        <div class="step-text">${s}</div>
+      </div>`).join('');
+
+    // Scroll nudge bottom — full animated zone
+    let nudgeHtml = '';
+    if (isActive) {
+      nudgeHtml = `
+        <div class="timer-pill" id="tpill-${rule.id}">
+          <div class="t-ring"></div>
+          <span>Next rule in <b id="tc-${rule.id}">10</b>s</span>
+        </div>`;
+    } else if (index < RULES.length - 1) {
+      nudgeHtml = `
+        <div class="nudge-zone">
+          <div class="nudge-bar" id="nudge-${index}" style="--hue:${hue(index+1)};--pct:0%">
+            <div class="nudge-ring">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M3 5l4 4 4-4" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+          <div class="nudge-arrows">
+            <svg class="arrow-chevron" viewBox="0 0 20 12" fill="none"><path d="M2 2l8 8 8-8" stroke="${hue(index+1)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg class="arrow-chevron" viewBox="0 0 20 12" fill="none"><path d="M2 2l8 8 8-8" stroke="${hue(index+1)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg class="arrow-chevron" viewBox="0 0 20 12" fill="none"><path d="M2 2l8 8 8-8" stroke="${hue(index+1)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="nudge-label">Scroll to Rule ${rule.id + 1}</div>
+        </div>`;
+    }
+
+    card.innerHTML = `
+      <div class="rule-meta">
+        <span class="rule-counter" style="color:${color}">Rule ${rule.id} of ${RULES.length}</span>
+        ${statusBadge}
+      </div>
+      <h2 class="rule-title">${rule.title}</h2>
+      <div class="ch-box" style="border-left:3px solid ${color}">
+        <div class="ch-label" style="color:${color}">Today's Challenge</div>
+        <p class="ch-text">${rule.challenge}</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div class="steps-label">How to execute</div>
+        ${stepsHtml}
+      </div>
+      <div class="tip-box" style="background:${color}0d;border-left:2px solid ${color}">
+        <p class="tip-text">${rule.tips}</p>
+      </div>
+      <div class="cta-area">
+        <div class="btn-row">
+          <button class="btn btn-skip ${h==='failed'?'on':''}" data-id="${rule.id}" data-action="failed">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5l10 10M11.5 1.5l-10 10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            ${h==='failed'?'Marked skipped':'Did not do it'}
+          </button>
+          <button class="btn btn-done ${h==='done'?'on':''}" data-id="${rule.id}" data-action="done"
+            style="${h==='done'?'':'background:'+color+';color:'+(isDark(color)?'#fff':'#000')+';border-color:'+color}">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 6.5l4 4 6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            ${h==='done'?'Completed!':'I did it!'}
+          </button>
+        </div>
+        ${nudgeHtml}
+      </div>`;
+
+    // Apply left stripe via pseudo workaround (inline div)
+    const stripe = document.createElement('div');
+    stripe.style.cssText = `position:absolute;left:0;top:20px;bottom:20px;width:3px;border-radius:0 2px 2px 0;background:${color};opacity:.7`;
+    card.appendChild(stripe);
+
+    feed.appendChild(card);
+    if (isActive) startTimer(rule.id);
+  });
+
+  feed.querySelectorAll('[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => markStatus(parseInt(btn.dataset.id), btn.dataset.action));
+  });
+}
+
+function isComplete() { return RULES.every(r => state.hist[r.id]); }
+
+function renderSummary() {
+  const feed = document.getElementById('feed');
+  feed.innerHTML = '';
+  const done = RULES.filter(r => state.hist[r.id] === 'done').length;
+  const total = RULES.length;
+  const score = Math.max(1, Math.round((done / total) * 10));
+  const msg = score <= 3 ? 'Room to grow. Tomorrow is another shot.' : score <= 6 ? 'Solid effort. Push harder next time.' : 'Strong performance. You showed up.';
+  const wrap = document.createElement('div');
+  wrap.className = 'summary';
+  wrap.innerHTML = `
+    <div class="summary-score" style="background:linear-gradient(135deg,${HUES.join(',')});-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${score}/10</div>
+    <div class="summary-msg">${msg}</div>
+    <div class="summary-rows">
+      ${RULES.map(r => {
+        const h = state.hist[r.id];
+        const isDone = h === 'done';
+        return `<div class="s-row">
+          <div class="s-ico" style="background:${isDone?'#34c759':'#ff3b30'};color:${isDone?'#000':'#fff'}">${isDone?'✓':'✕'}</div>
+          <div class="s-txt">${r.title}</div>
+          <div class="s-st" style="color:${isDone?'#34c759':'#ff3b30'}">${isDone?'Done':'Skipped'}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:11px;color:var(--text3);letter-spacing:-.01em;margin-top:4px">Come for more tips tomorrow</div>
+    <button class="summary-reset" onclick="resetAll()">Start Over</button>`;
+  feed.appendChild(wrap);
+}
+
+function resetAll() {
+  localStorage.removeItem('as_idx'); localStorage.removeItem('as_hist');
+  state.idx = 0; state.hist = {}; state.timers = {};
+  renderAll();
+}
+
+function isDark(hex) {
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return (r*299+g*587+b*114)/1000 < 128;
+}
+
+function startTimer(ruleId) {
+  if (state.timers[ruleId]) return;
+  let left = 10;
+  const tc = document.getElementById('tc-'+ruleId);
+  const pill = document.getElementById('tpill-'+ruleId);
+  if (!tc) return;
+
+  const isLast = ruleId === RULES[RULES.length-1].id;
+  const iv = setInterval(() => {
+    left--;
+    if (tc) tc.textContent = left;
+    if (left <= 0) {
+      clearInterval(iv);
+      if (isLast) { if (!state.hist[ruleId]) markStatus(ruleId, 'done'); }
+      else { state.idx++; save(); renderAll(); }
+    }
+  }, 1000);
+  state.timers[ruleId] = iv;
+}
+
+/* ── Ledger ── */
+function renderLedger() {
+  const g = document.getElementById('ledger');
+  g.innerHTML = '';
+  RULES.forEach((r,i) => {
+    const c = document.createElement('div');
+    c.className = 'l-cell';
+    const h = state.hist[r.id];
+    if (h==='done') c.classList.add('done');
+    else if (h==='failed') c.classList.add('failed');
+    if (!h) c.style.borderTopColor = hue(i);
+    c.innerHTML = `<div class="l-id">R${r.id}</div><div class="l-ic">${h==='done'?'✓':h==='failed'?'✕':'·'}</div>`;
+    g.appendChild(c);
+  });
+}
+
+function renderAll() {
+  renderProg(); renderLedger();
+  if (isComplete()) { renderSummary(); }
+  else { renderFeed(); }
+}
+
+/* ── Theme ── */
+const html = document.documentElement;
+html.setAttribute('data-theme', localStorage.getItem('as_theme')||'dark');
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const n = html.dataset.theme==='dark'?'light':'dark';
+  html.setAttribute('data-theme',n); localStorage.setItem('as_theme',n);
+});
+
+/* ── Sheet ── */
+const sw = document.getElementById('sheetWrap');
+document.getElementById('gridBtn').addEventListener('click', () => { renderLedger(); sw.classList.add('open'); });
+sw.addEventListener('click', e => { if(e.target===sw) sw.classList.remove('open'); });
+
+renderAll();
+</script>
+</body>
+</html>
