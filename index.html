@@ -41,27 +41,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 .icon-btn svg{display:block}
 
 /* ── Single rainbow progress bar ── */
-.prog-wrap{padding:12px 18px 4px;background:var(--bg)}
-.prog-track{position:relative;height:36px;display:flex;align-items:center}
-.prog-line-bg{position:absolute;left:8px;right:8px;height:2px;background:var(--surface2);border-radius:1px;z-index:0}
-.prog-line-fill{position:absolute;left:8px;height:2px;border-radius:1px;z-index:1;
-  background:linear-gradient(90deg,#ff3b30,#ff9500,#ffcc00,#34c759,#00c7be,#007aff,#af52de);
-  transition:width .5s cubic-bezier(.4,0,.2,1);min-width:0}
-.prog-nodes{position:absolute;left:0;right:0;display:flex;justify-content:space-between;padding:0 8px;z-index:2}
-.prog-node{width:12px;height:12px;border-radius:50%;border:2px solid var(--surface2);
-  background:var(--bg);cursor:pointer;transition:.25s;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;position:relative}
-.prog-node.done{border-width:0;width:14px;height:14px}
-.prog-node.failed{border-width:0;width:14px;height:14px;background:#ff3b30 !important}
-.prog-node.active{border-color:transparent;width:16px;height:16px;box-shadow:0 0 0 3px rgba(255,255,255,.13)}
-.prog-node.locked{opacity:.2;cursor:default;pointer-events:none}
-.prog-node svg{display:block}
-.prog-labels{display:flex;justify-content:space-between;padding:0 4px;margin-top:1px}
-.prog-lbl{font-size:9px;font-weight:600;color:var(--text3);letter-spacing:-.01em;
-  width:20px;text-align:center;transition:.2s;font-variant-numeric:tabular-nums}
-.prog-lbl.active{color:var(--text);font-weight:700}
-.prog-lbl.done{color:var(--text2)}
-.prog-lbl.failed{color:#ff3b30}
+.prog-wrap{padding:12px 18px 12px;background:var(--bg)}
+.prog-track{position:relative;height:12px;display:flex;align-items:center;background:var(--surface2);border-radius:6px;overflow:hidden;}
+.prog-line-fill{height:100%;background:linear-gradient(90deg,#ff3b30,#ff9500,#ffcc00,#34c759,#00c7be,#007aff,#af52de);transition:width .5s cubic-bezier(.4,0,.2,1);width:0%}
+.prog-labels{display:flex;justify-content:space-between;padding:0 4px;margin-top:6px}
+.prog-lbl{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:-.01em;}
+.prog-lbl strong{color:var(--text);font-weight:700;}
 
 /* ── Feed ── */
 .feed{flex:1;overflow-y:scroll;overflow-x:hidden;scroll-snap-type:y mandatory;scrollbar-width:none}
@@ -212,9 +197,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   </div>
   <div class="prog-wrap" id="progWrap">
     <div class="prog-track">
-      <div class="prog-line-bg"></div>
       <div class="prog-line-fill" id="progFill"></div>
-      <div class="prog-nodes" id="progNodes"></div>
     </div>
     <div class="prog-labels" id="progLabels"></div>
   </div>
@@ -230,36 +213,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   </div>
 </div>
 
+<script src="rules.js"></script>
 <script>
 const HUES = ['#ff3b30','#ff9500','#ffcc00','#34c759','#00c7be','#007aff','#af52de'];
 
-const RULES = [
-  {id:1,title:'Show me your friends and I\'ll show you your future.',
-   challenge:'Audit your closest relationships and identify one that pulls you downward.',
-   steps:['List the five people you spend the most time with.','Rate each on whether they challenge or comfort you.','Schedule a conversation with the one who challenges you most.'],
-   tips:'Your trajectory is the average of the five people you orbit most closely.'},
-  {id:2,title:'Your doubts are not products of accurate thinking, but habitual thinking.',
-   challenge:'Catch and rewrite three self-doubt thoughts today as factual observations.',
-   steps:['Notice the first moment you doubt yourself today and freeze it.','Write down the doubt and label it as a habit, not truth.','Replace it with one cold fact that contradicts it.'],
-   tips:'Doubt is just a neural groove worn deep by repetition, not a mirror of reality.'},
-  {id:3,title:'Being all you can be is possible for anyone, but super success is not for everyone. Period.',
-   challenge:'Identify the price you are unwilling to pay and own it honestly.',
-   steps:['Write down what super success would require from you in the next year.','Circle the one sacrifice you are not genuinely ready to make.','Decide whether to accept that limit or transcend it — no judgment either way.'],
-   tips:'Super success demands super cost. The honest choice is clearer than the comfortable lie.'},
-  {id:4,title:'Fear of failure is caused by lack of self-esteem and confidence. Dealing with fear is the key to super success.',
-   challenge:'Do one thing today that you might fail at, intentionally.',
-   steps:['Pick a small task with real risk of embarrassment or failure.','Set a timer for 10 minutes and start before you feel ready.','Afterward, note what actually happened vs what you feared.'],
-   tips:'Fear shrinks when you move toward it. Confidence is a byproduct of action, not its prerequisite.'},
-  {id:5,title:'We are all afraid. A high performance person uses his fear to galvanize his actions.',
-   challenge:'Channel fear into fuel: convert one anxious energy spike into intense focused work.',
-   steps:['Notice when fear or anxiety rises in your body today.','Label the energy level 1-10, then channel it into a physical or deep-work burst.','Write down what fear made you produce that calm never could.'],
-   tips:'The same adrenaline that fuels panic also fuels performance. The valve is in your hands.'}
-];
-
 let state = {
   idx: parseInt(localStorage.getItem('as_idx')||'0'),
-  hist: JSON.parse(localStorage.getItem('as_hist')||'{}'),
-  timers: {}
+  hist: JSON.parse(localStorage.getItem('as_hist')||'{}')
 };
 
 const hue = i => HUES[i % HUES.length];
@@ -269,54 +229,18 @@ function markStatus(id, s) { state.hist[id] = s; save(); renderAll(); }
 
 /* ── Single rainbow progress bar ── */
 function renderProg() {
-  const nodes = document.getElementById('progNodes');
   const labels = document.getElementById('progLabels');
   const fill = document.getElementById('progFill');
-  if (!nodes) return;
-  nodes.innerHTML = ''; labels.innerHTML = '';
+  if (!fill) return;
 
-  // Compute fill width: from first node to current active node
   const total = RULES.length;
-  const doneCount = RULES.filter((_,i) => i < state.idx).length;
-  // fill spans node-to-node; each node is equally spaced across the line
-  // line goes from 8px to (width-8px), nodes spaced equally
-  // we express as % of the nodes span
-  const pct = total > 1 ? (state.idx / (total - 1)) * 100 : 0;
-  // use JS to set actual width after paint via a small trick with container
-  fill.style.width = '0%';
-  requestAnimationFrame(() => {
-    const trackW = fill.parentElement.offsetWidth - 16; // minus 2*8px padding
-    fill.style.width = (pct / 100 * trackW) + 'px';
-  });
-
-  RULES.forEach((r, i) => {
-    const h = state.hist[r.id];
-    const color = hue(i);
-
-    // Node
-    const nd = document.createElement('div');
-    nd.className = 'prog-node';
-    if (i > state.idx) nd.classList.add('locked');
-    else if (h === 'done') { nd.classList.add('done'); nd.style.background = color; nd.innerHTML = `<svg width="7" height="7" viewBox="0 0 7 7" fill="none"><path d="M1 3.5l2 2 3-3" stroke="#000" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`; }
-    else if (h === 'failed') { nd.classList.add('failed'); nd.innerHTML = `<svg width="7" height="7" viewBox="0 0 7 7" fill="none"><path d="M1.5 1.5l4 4M5.5 1.5l-4 4" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></svg>`; }
-    else if (i === state.idx) { nd.classList.add('active'); nd.style.background = color; nd.style.borderColor = color; }
-    else { nd.style.borderColor = color; }
-
-    nd.addEventListener('click', () => {
-      if (i <= state.idx) {
-        const card = document.getElementById('card-'+i);
-        if (card) card.scrollIntoView({behavior:'smooth'});
-      }
-    });
-    nodes.appendChild(nd);
-
-    // Label
-    const lb = document.createElement('div');
-    lb.className = 'prog-lbl' + (i === state.idx ? ' active' : h === 'done' ? ' done' : h === 'failed' ? ' failed' : '');
-    lb.textContent = i + 1;
-    if (i === state.idx) lb.style.color = color;
-    labels.appendChild(lb);
-  });
+  const doneCount = RULES.filter(r => state.hist[r.id] === 'done').length;
+  const completedCount = Object.keys(state.hist).length;
+  const pct = total > 0 ? (completedCount / total) * 100 : 0;
+  
+  fill.style.width = pct + '%';
+  labels.innerHTML = `<div class="prog-lbl">Completed: <strong>${doneCount}</strong> / ${total}</div>
+                      <div class="prog-lbl">Progress: <strong>${Math.round(pct)}%</strong></div>`;
 }
 
 /* ── Feed ── */
@@ -336,23 +260,7 @@ function renderFeed() {
     card.style.cssText += `--card-hue:${color}`;
     card.querySelector?.('.card::before');
 
-    const unlocked = index <= state.idx;
-
-    if (!unlocked) {
-      card.innerHTML = `
-        <div class="locked-overlay">
-          <svg class="lock-glyph" width="32" height="32" viewBox="0 0 24 24" fill="none">
-            <rect x="5" y="11" width="14" height="11" rx="2.5" stroke="currentColor" stroke-width="1.4"/>
-            <path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          </svg>
-          <div class="lock-label">Unlocks after the timer</div>
-        </div>`;
-      feed.appendChild(card);
-      return;
-    }
-
     const h = state.hist[rule.id];
-    const isActive = index === state.idx;
 
     const statusBadge = h==='done'
       ? `<span class="status-pill done">✓ Complete</span>`
@@ -364,30 +272,15 @@ function renderFeed() {
         <div class="step-text">${s}</div>
       </div>`).join('');
 
-    // Scroll nudge bottom — full animated zone
     let nudgeHtml = '';
-    if (isActive) {
+    if (index < RULES.length - 1) {
       nudgeHtml = `
-        <div class="timer-pill" id="tpill-${rule.id}">
-          <div class="t-ring"></div>
-          <span>Next rule in <b id="tc-${rule.id}">10</b>s</span>
-        </div>`;
-    } else if (index < RULES.length - 1) {
-      nudgeHtml = `
-        <div class="nudge-zone">
-          <div class="nudge-bar" id="nudge-${index}" style="--hue:${hue(index+1)};--pct:0%">
-            <div class="nudge-ring">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M3 5l4 4 4-4" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </div>
-          </div>
+        <div class="nudge-zone" style="cursor:pointer;" onclick="document.getElementById('card-${index+1}').scrollIntoView({behavior:'smooth'})">
           <div class="nudge-arrows">
             <svg class="arrow-chevron" viewBox="0 0 20 12" fill="none"><path d="M2 2l8 8 8-8" stroke="${hue(index+1)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <svg class="arrow-chevron" viewBox="0 0 20 12" fill="none"><path d="M2 2l8 8 8-8" stroke="${hue(index+1)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <svg class="arrow-chevron" viewBox="0 0 20 12" fill="none"><path d="M2 2l8 8 8-8" stroke="${hue(index+1)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
-          <div class="nudge-label">Scroll to Rule ${rule.id + 1}</div>
+          <div class="nudge-label">Next Rule</div>
         </div>`;
     }
 
@@ -429,7 +322,6 @@ function renderFeed() {
     card.appendChild(stripe);
 
     feed.appendChild(card);
-    if (isActive) startTimer(rule.id);
   });
 
   feed.querySelectorAll('[data-action]').forEach(btn => {
@@ -469,7 +361,7 @@ function renderSummary() {
 
 function resetAll() {
   localStorage.removeItem('as_idx'); localStorage.removeItem('as_hist');
-  state.idx = 0; state.hist = {}; state.timers = {};
+  state.idx = 0; state.hist = {};
   renderAll();
 }
 
@@ -478,25 +370,7 @@ function isDark(hex) {
   return (r*299+g*587+b*114)/1000 < 128;
 }
 
-function startTimer(ruleId) {
-  if (state.timers[ruleId]) return;
-  let left = 10;
-  const tc = document.getElementById('tc-'+ruleId);
-  const pill = document.getElementById('tpill-'+ruleId);
-  if (!tc) return;
 
-  const isLast = ruleId === RULES[RULES.length-1].id;
-  const iv = setInterval(() => {
-    left--;
-    if (tc) tc.textContent = left;
-    if (left <= 0) {
-      clearInterval(iv);
-      if (isLast) { if (!state.hist[ruleId]) markStatus(ruleId, 'done'); }
-      else { state.idx++; save(); renderAll(); }
-    }
-  }, 1000);
-  state.timers[ruleId] = iv;
-}
 
 /* ── Ledger ── */
 function renderLedger() {
